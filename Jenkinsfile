@@ -50,6 +50,30 @@ print('Prueba de humo OK')
             }
         }
 
+        stage('Security Scan') {
+            steps {
+                // Revisión de seguridad automática, en modo informe: registra los hallazgos
+                // pero no detiene el pipeline (el código vulnerable es el objeto de estudio).
+                //  - bandit: análisis estático del código Python (SAST)
+                //  - pip-audit: dependencias con vulnerabilidades conocidas (CVE/PYSEC)
+                // Se ejecuta en un contenedor aparte; los archivos se copian con docker cp
+                // porque Jenkins corre en un contenedor y no comparte rutas con el host.
+                sh '''
+                    rm -rf reports && mkdir -p reports
+                    cid=$(docker create python:3.11-slim sh -c "mkdir -p /out && pip install -q --disable-pip-version-check bandit pip-audit >/dev/null 2>&1; cd /src; bandit -r app.py -f txt -o /out/bandit.txt; pip-audit -r requirements.txt > /out/pip-audit.txt 2>&1; true")
+                    docker cp ${APP_DIR}/. $cid:/src
+                    docker start -a $cid > /dev/null 2>&1 || true
+                    docker cp $cid:/out/. reports/
+                    docker rm $cid > /dev/null
+                    echo "=========== BANDIT (análisis estático) ==========="
+                    cat reports/bandit.txt
+                    echo "=========== PIP-AUDIT (dependencias) ==========="
+                    cat reports/pip-audit.txt
+                '''
+                archiveArtifacts artifacts: 'reports/*', allowEmptyArchive: true
+            }
+        }
+
         stage('Deploy') {
             steps {
                 // Despliega exactamente la imagen construida y probada en las etapas anteriores:
