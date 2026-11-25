@@ -52,25 +52,33 @@ print('Prueba de humo OK')
 
         stage('Security Scan') {
             steps {
-                // Revisión de seguridad automática, en modo informe: registra los hallazgos
-                // pero no detiene el pipeline (el código vulnerable es el objeto de estudio).
+                // Puerta de seguridad (quality gate): si bandit o pip-audit encuentran
+                // vulnerabilidades, la etapa falla y el Deploy NO se ejecuta.
                 //  - bandit: análisis estático del código Python (SAST)
                 //  - pip-audit: dependencias con vulnerabilidades conocidas (CVE/PYSEC)
                 // Se ejecuta en un contenedor aparte; los archivos se copian con docker cp
                 // porque Jenkins corre en un contenedor y no comparte rutas con el host.
-                sh '''
-                    rm -rf reports && mkdir -p reports
-                    cid=$(docker create python:3.11-slim sh -c "mkdir -p /out && pip install -q --disable-pip-version-check bandit pip-audit >/dev/null 2>&1; cd /src; bandit -r app.py -f txt -o /out/bandit.txt; pip-audit -r requirements.txt > /out/pip-audit.txt 2>&1; true")
-                    docker cp ${APP_DIR}/. $cid:/src
-                    docker start -a $cid > /dev/null 2>&1 || true
-                    docker cp $cid:/out/. reports/
-                    docker rm $cid > /dev/null
-                    echo "=========== BANDIT (análisis estático) ==========="
-                    cat reports/bandit.txt
-                    echo "=========== PIP-AUDIT (dependencias) ==========="
-                    cat reports/pip-audit.txt
-                '''
-                archiveArtifacts artifacts: 'reports/*', allowEmptyArchive: true
+                script {
+                    // Siempre se imprime y archiva el informe; el código de salida decide el resultado.
+                    def rc = sh(returnStatus: true, script: '''
+                        rm -rf reports && mkdir -p reports
+                        cid=$(docker create python:3.11-slim sh -c "mkdir -p /out && pip install -q --disable-pip-version-check bandit pip-audit >/dev/null 2>&1; cd /src; bandit -r app.py -f txt -o /out/bandit.txt; echo \\$? > /out/bandit.rc; pip-audit -r requirements.txt > /out/pip-audit.txt 2>&1; echo \\$? > /out/pip-audit.rc; true")
+                        docker cp ${APP_DIR}/. $cid:/src
+                        docker start -a $cid > /dev/null 2>&1 || true
+                        docker cp $cid:/out/. reports/
+                        docker rm $cid > /dev/null
+                        echo "=========== BANDIT (análisis estático) ==========="
+                        cat reports/bandit.txt
+                        echo "=========== PIP-AUDIT (dependencias) ==========="
+                        cat reports/pip-audit.txt
+                        # Falla si cualquiera de las dos herramientas encontró algo (código de salida distinto de 0)
+                        [ "$(cat reports/bandit.rc)" = "0" ] && [ "$(cat reports/pip-audit.rc)" = "0" ]
+                    ''')
+                    archiveArtifacts artifacts: 'reports/*', allowEmptyArchive: true
+                    if (rc != 0) {
+                        error('Security Scan: se encontraron vulnerabilidades. Despliegue bloqueado hasta corregirlas.')
+                    }
+                }
             }
         }
 
