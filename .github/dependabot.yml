@@ -1,0 +1,20 @@
+version: 2
+updates:
+  # Dependencias de Python de la app (requirements.txt)
+  - package-ecosystem: "pip"
+    directory: "/securedev-lab"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+
+  # Imagen base y Dockerfile de la app
+  - package-ecosystem: "docker"
+    directory: "/securedev-lab"
+    schedule:
+      interval: "weekly"
+
+  # Imagen base del Dockerfile de Jenkins (infra)
+  - package-ecosystem: "docker"
+    directory: "/infra/jenkins"
+    schedule:
+      interval: "weekly"
