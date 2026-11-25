@@ -12,6 +12,8 @@ services:
     volumes:
       - jenkins_home:/var/jenkins_home
       - /var/run/docker.sock:/var/run/docker.sock
+    # app_net: para que OWASP ZAP (corre dentro de Jenkins) alcance la app por "app:8000"
+    networks: [default, app_net]
 
   prometheus:
     image: prom/prometheus:latest

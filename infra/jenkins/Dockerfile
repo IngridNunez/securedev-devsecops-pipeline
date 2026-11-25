@@ -9,5 +9,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
  && rm -rf /var/lib/apt/lists/*
 # Plugins mínimos para el pipeline
 RUN jenkins-plugin-cli --plugins workflow-aggregator git docker-workflow htmlpublisher
+
+# OWASP ZAP para pruebas dinámicas de seguridad (DAST); usa el Java que ya trae Jenkins
+ARG ZAP_VERSION=2.17.0
+RUN curl -sSL "https://github.com/zaproxy/zaproxy/releases/download/v${ZAP_VERSION}/ZAP_${ZAP_VERSION}_Linux.tar.gz" \
+    | tar -xz -C /opt \
+ && ln -s /opt/ZAP_${ZAP_VERSION}/zap.sh /usr/local/bin/zap.sh
+
 # Laboratorio local: root para poder usar el socket de Docker
 USER root

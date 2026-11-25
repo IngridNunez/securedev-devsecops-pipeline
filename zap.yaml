@@ -1,0 +1,59 @@
+# Plan de OWASP ZAP (Automation Framework) para SecureDev Tickets.
+# Basado en el material de clase (unidad 3) y adaptado a esta app:
+# login con formulario, autenticación como ana/ana123, puerto 8000.
+env:
+  contexts:
+    - name: securedev
+      urls:
+        - http://app:8000
+      authentication:
+        method: form
+        parameters:
+          loginPageUrl: http://app:8000/login
+          loginRequestUrl: http://app:8000/login
+          loginRequestBody: "username={%username%}&password={%password%}"
+      sessionManagement:
+        method: cookie
+      users:
+        - name: ana
+          credentials:
+            username: ana
+            password: ana123
+  parameters:
+    failOnError: true
+    progressToStdout: true
+
+jobs:
+  - type: spider             # recorre la app siguiendo enlaces y formularios
+    parameters:
+      context: securedev
+      user: ana
+      maxDuration: 1
+
+  - type: passiveScan-wait   # revisa respuestas sin atacar: cabeceras, cookies...
+    parameters:
+      maxDuration: 2
+
+  - type: activeScan         # ataca de verdad: XSS, inyecciones...
+    parameters:
+      context: securedev
+      user: ana
+      maxRuleDurationInMins: 1
+      maxScanDurationInMins: 4
+
+  - type: report
+    parameters:
+      template: traditional-html
+      reportDir: ${WORKSPACE}/zapreports
+      reportFile: zap-report
+
+  - type: report
+    parameters:
+      template: traditional-json
+      reportDir: ${WORKSPACE}/zapreports
+      reportFile: zap-report
+
+  - type: exitStatus         # quality gate: Alto = falla, Medio = inestable
+    parameters:
+      errorLevel: High
+      warnLevel: Medium

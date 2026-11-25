@@ -1,6 +1,6 @@
 // Pipeline CI/CD - SecureDev Tickets (OCY1102 Actividad 3)
-// Etapas actuales: Checkout -> Build -> Test -> Deploy.
-// Las etapas de seguridad (pip-audit, bandit, OWASP ZAP) se agregan en commits posteriores.
+// Etapas: Checkout -> Build -> Test -> DAST (OWASP ZAP) -> Security Scan (bandit/pip-audit) -> Deploy.
+// DAST documenta hallazgos sin bloquear (unstable); Security Scan sí bloquea el Deploy (error).
 
 pipeline {
     agent any
@@ -47,6 +47,26 @@ assert c.get('/tickets/1').status_code == 302, 'ticket sin sesion debe redirigir
 print('Prueba de humo OK')
 "
                 '''
+            }
+        }
+
+        stage('DAST (OWASP ZAP)') {
+            steps {
+                // Pruebas dinámicas de seguridad: ZAP ataca la app ya desplegada
+                // (http://app:8000, misma red Docker) con el plan de zap.yaml.
+                // No bloquea el Deploy (a diferencia de Security Scan): solo
+                // documenta los hallazgos y marca la build como inestable si
+                // encuentra alertas de riesgo medio o alto.
+                script {
+                    sh 'mkdir -p zapreports'
+                    def rc = sh(script: 'zap.sh -cmd -port 8091 -autorun "$WORKSPACE/zap.yaml"', returnStatus: true)
+                    archiveArtifacts artifacts: 'zapreports/*', allowEmptyArchive: true
+                    if (rc == 1) {
+                        unstable('DAST (ZAP): alertas de riesgo ALTO encontradas. Ver zapreports/zap-report.html')
+                    } else if (rc == 2) {
+                        unstable('DAST (ZAP): alertas de riesgo MEDIO encontradas. Ver zapreports/zap-report.html')
+                    }
+                }
             }
         }
 
