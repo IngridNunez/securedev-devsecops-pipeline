@@ -1,0 +1,77 @@
+{
+  "uid": "securedev-monitoreo",
+  "title": "SecureDev - Monitoreo",
+  "tags": ["securedev", "seguridad"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "time": { "from": "now-1h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Solicitudes por segundo",
+      "description": "Tráfico general de la aplicación. Picos anómalos pueden indicar escaneos o denegación de servicio.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum(rate(securedev_http_requests_total[1m]))",
+          "legendFormat": "solicitudes/s"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Errores 4xx/5xx",
+      "description": "Respuestas con error. Muchos 404 seguidos suelen indicar escaneo de rutas; los 5xx indican fallos de la app.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum(rate(securedev_http_requests_total{status=~\"4..|5..\"}[5m]))",
+          "legendFormat": "errores/s"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Logins fallidos (5 min)",
+      "description": "Intentos de acceso fallidos en los últimos 5 minutos. Un aumento sostenido indica posible fuerza bruta.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "increase(securedev_login_failures_total[5m])",
+          "legendFormat": "logins fallidos"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Latencia p95",
+      "description": "Tiempo de respuesta del 95% de las solicitudes. Una subida sostenida indica degradación del servicio.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "histogram_quantile(0.95, sum(rate(securedev_http_request_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p95"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,85 @@
+apiVersion: 1
+groups:
+  - orgId: 1
+    name: seguridad-securedev
+    folder: SecureDev
+    interval: 1m
+    rules:
+      - uid: securedev-fuerza-bruta
+        title: Posible fuerza bruta en /login
+        condition: C
+        for: 0s
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severidad: alta
+        annotations:
+          summary: "Más de 10 intentos de login fallidos en 5 minutos"
+          respuesta: "Revisar el origen de los intentos, bloquear la IP o cuenta afectada y rotar credenciales si hubo acceso"
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              datasource: { type: prometheus, uid: prometheus }
+              expr: increase(securedev_login_failures_total[5m])
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              datasource: { type: __expr__, uid: __expr__ }
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              datasource: { type: __expr__, uid: __expr__ }
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [10] }
+              refId: C
+      - uid: securedev-servicio-caido
+        title: Servicio SecureDev caído
+        condition: C
+        for: 1m
+        noDataState: Alerting
+        execErrState: Error
+        labels:
+          severidad: critica
+        annotations:
+          summary: "La aplicación no responde a Prometheus desde hace 1 minuto"
+          respuesta: "Reiniciar el contenedor y revisar los registros para identificar la causa"
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              datasource: { type: prometheus, uid: prometheus }
+              expr: up{job="securedev-app"}
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              datasource: { type: __expr__, uid: __expr__ }
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              datasource: { type: __expr__, uid: __expr__ }
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: lt, params: [1] }
+              refId: C
